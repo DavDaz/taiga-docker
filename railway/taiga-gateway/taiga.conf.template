@@ -1,0 +1,57 @@
+server {
+    listen ${PORT} default_server;
+
+    client_max_body_size 100M;
+    charset utf-8;
+
+    # Frontend
+    location / {
+        proxy_pass http://taiga-front.railway.internal:80/;
+        proxy_pass_header Server;
+        proxy_set_header Host $http_host;
+        proxy_redirect off;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Scheme $scheme;
+    }
+
+    # API
+    location /api/ {
+        proxy_pass http://taiga-back.railway.internal:8000/api/;
+        proxy_pass_header Server;
+        proxy_set_header Host $http_host;
+        proxy_redirect off;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Scheme $scheme;
+    }
+
+    # Admin
+    location /admin/ {
+        proxy_pass http://taiga-back.railway.internal:8000/admin/;
+        proxy_pass_header Server;
+        proxy_set_header Host $http_host;
+        proxy_redirect off;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Scheme $scheme;
+    }
+
+    # Static files - proxied to backend (whitenoise serves them)
+    location /static/ {
+        proxy_pass http://taiga-back.railway.internal:8000/static/;
+        proxy_pass_header Server;
+        proxy_set_header Host $http_host;
+        proxy_redirect off;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Scheme $scheme;
+    }
+
+    # Media files - proxied to backend (Django serves them)
+    location /media/ {
+        proxy_pass http://taiga-back.railway.internal:8000/media/;
+        proxy_pass_header Server;
+        proxy_set_header Host $http_host;
+        proxy_redirect off;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Scheme $scheme;
+        add_header Content-disposition "attachment";
+    }
+}
