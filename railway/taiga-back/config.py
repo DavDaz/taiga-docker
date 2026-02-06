@@ -39,18 +39,16 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 ROOT_URLCONF = "settings.urls_railway"
 
 # --------------------------------------------------------------------------
-# RabbitMQ - single instance on Railway internal networking
+# Events & Celery - DISABLED (no RabbitMQ/taiga-events in minimal deploy)
 # --------------------------------------------------------------------------
+EVENTS_PUSH_BACKEND = "taiga.events.backends.postgresql.EventsPushBackend"
+CELERY_ENABLED = False
 
-_rabbitmq_host = os.getenv("RABBITMQ_HOST", "rabbitmq.railway.internal")
-_rabbitmq_user = os.getenv("RABBITMQ_USER", "taiga")
-_rabbitmq_pass = os.getenv("RABBITMQ_PASS", "taiga")
-_rabbitmq_vhost = os.getenv("RABBITMQ_VHOST", "taiga")
-
-CELERY_BROKER_URL = f"amqp://{_rabbitmq_user}:{_rabbitmq_pass}@{_rabbitmq_host}:5672/{_rabbitmq_vhost}"
-
-EVENTS_PUSH_BACKEND = "taiga.events.backends.rabbitmq.EventsPushBackend"
-EVENTS_PUSH_BACKEND_URL = f"amqp://{_rabbitmq_user}:{_rabbitmq_pass}@{_rabbitmq_host}:5672/{_rabbitmq_vhost}"
+# Override Celery broker from common.py (default points to localhost:5672)
+CELERY_BROKER_URL = "memory://"
+BROKER_URL = "memory://"
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True
 
 # --------------------------------------------------------------------------
 # Media files - served by Django in Railway (no shared volumes)
