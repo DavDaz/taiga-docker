@@ -288,6 +288,65 @@ docker compose up -d
 
 ---
 
+## 8. Mantenimiento: Limpiar datos sin romper el proyecto
+
+### Eliminar todos los proyectos (conservar usuarios)
+
+Usa `TRUNCATE CASCADE` desde el Django shell via Railway SSH. Esto elimina los proyectos y todos sus datos relacionados (tareas, historias, issues, timeline, adjuntos, etc.) pero conserva los usuarios y la configuracion del sistema.
+
+```bash
+railway ssh --service taiga-back -- \
+  'python manage.py shell -c "
+from django.db import connection
+cursor = connection.cursor()
+cursor.execute(\"TRUNCATE TABLE projects_project CASCADE\")
+print(\"Proyectos eliminados\")
+cursor.execute(\"SELECT COUNT(*) FROM projects_project\")
+print(\"Restantes: \" + str(cursor.fetchone()[0]))
+"'
+```
+
+> **IMPORTANTE**: No uses `Project.objects.all().delete()` directamente. Los signals de Django (timeline) causan errores de foreign key durante la eliminacion. `TRUNCATE CASCADE` evita este problema.
+
+### Verificar que los usuarios siguen intactos
+
+```bash
+railway ssh --service taiga-back -- \
+  'python manage.py shell -c "
+from django.contrib.auth import get_user_model
+User = get_user_model()
+for u in User.objects.all():
+    print(u.username + \" - \" + u.email)
+"'
+```
+
+### Listar proyectos existentes (antes de borrar)
+
+```bash
+railway ssh --service taiga-back -- \
+  'python manage.py shell -c "
+from taiga.projects.models import Project
+for p in Project.objects.all():
+    print(str(p.id) + \" | \" + p.name)
+"'
+```
+
+### Eliminar un proyecto especifico por ID
+
+```bash
+# Reemplazar PROJECT_ID con el ID del proyecto
+railway ssh --service taiga-back -- \
+  'python manage.py shell -c "
+from django.db import connection
+cursor = connection.cursor()
+cursor.execute(\"DELETE FROM timeline_timeline WHERE project_id = PROJECT_ID\")
+cursor.execute(\"DELETE FROM projects_project WHERE id = PROJECT_ID\")
+print(\"Proyecto PROJECT_ID eliminado\")
+"'
+```
+
+---
+
 ## Resumen rapido
 
 ```bash
