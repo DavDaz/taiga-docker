@@ -51,14 +51,29 @@ CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
 
 # --------------------------------------------------------------------------
-# Media files - served by Django in Railway (no shared volumes)
+# Media files - Cloudflare R2 (if R2_ACCESS_KEY_ID defined) or filesystem
 # --------------------------------------------------------------------------
-MEDIA_URL = "/media/"
+if os.getenv("R2_ACCESS_KEY_ID"):
+    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
 
-# --------------------------------------------------------------------------
-# Disable protected media (no taiga-protected service)
-# --------------------------------------------------------------------------
-DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
+    AWS_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY")
+    AWS_STORAGE_BUCKET_NAME = os.getenv("R2_BUCKET_NAME")
+    AWS_S3_ENDPOINT_URL = f"https://{os.getenv('R2_ACCOUNT_ID')}.r2.cloudflarestorage.com"
+    AWS_S3_REGION_NAME = "auto"
+    AWS_DEFAULT_ACL = None          # R2 uses bucket-level public access
+    AWS_S3_SIGNATURE_VERSION = "s3v4"
+    AWS_QUERYSTRING_AUTH = False    # Public URLs without signing
+
+    _r2_public_url = os.getenv("R2_PUBLIC_URL", "").rstrip("/")
+    AWS_S3_CUSTOM_DOMAIN = _r2_public_url.replace("https://", "").replace("http://", "")
+    MEDIA_URL = f"{_r2_public_url}/"
+    MEDIA_ROOT = ""
+else:
+    # Fallback: local filesystem (ephemeral, files lost on redeploy)
+    DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
+    MEDIA_URL = "/media/"
+    MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 # --------------------------------------------------------------------------
 # Taiga settings from env vars (same as official docker/config.py)
