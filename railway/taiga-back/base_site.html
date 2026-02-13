@@ -1,0 +1,42 @@
+{% extends "admin/base.html" %}
+{% load i18n %}
+
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | Taiga Admin{% endblock %}
+
+{% block branding %}
+<h1 id="site-name"><a href="{% url 'admin:index' %}">Taiga Admin</a></h1>
+{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+:root {
+    --primary: #27ae60;
+    --secondary: #1e8449;
+    --accent: #27ae60;
+    --primary-fg: #fff;
+    --link-fg: #1e8449;
+    --link-hover-color: #145a32;
+    --link-selected-fg: #27ae60;
+    --button-bg: #27ae60;
+    --button-hover-bg: #1e8449;
+    --default-button-bg: #27ae60;
+    --default-button-hover-bg: #1e8449;
+    --breadcrumbs-bg: #1e8449;
+    --breadcrumbs-fg: #e8f5e9;
+    --breadcrumbs-link-fg: #e8f5e9;
+}
+#header {
+    background: #27ae60;
+}
+div.breadcrumbs {
+    background: #1e8449;
+}
+div.breadcrumbs a {
+    color: #e8f5e9;
+}
+.module h2, .module caption, .inline-group h2 {
+    background: #27ae60;
+}
+</style>
+{% endblock %}

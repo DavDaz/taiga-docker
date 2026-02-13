@@ -4,9 +4,13 @@ server {
     client_max_body_size 100M;
     charset utf-8;
 
+    # Re-resolve upstream DNS every 10s (prevents stale IPs after service redeploy)
+    resolver ${NGINX_RESOLVER} valid=10s ipv6=off;
+
     # Frontend
     location / {
-        proxy_pass http://taiga-front.railway.internal:80/;
+        set $upstream_front http://taiga-front.railway.internal:80;
+        proxy_pass $upstream_front$request_uri;
         proxy_pass_header Server;
         proxy_set_header Host $http_host;
         proxy_redirect off;
@@ -16,7 +20,8 @@ server {
 
     # API
     location /api/ {
-        proxy_pass http://taiga-back.railway.internal:8000/api/;
+        set $upstream_back http://taiga-back.railway.internal:8000;
+        proxy_pass $upstream_back$request_uri;
         proxy_pass_header Server;
         proxy_set_header Host $http_host;
         proxy_redirect off;
@@ -26,7 +31,8 @@ server {
 
     # Admin
     location /admin/ {
-        proxy_pass http://taiga-back.railway.internal:8000/admin/;
+        set $upstream_back http://taiga-back.railway.internal:8000;
+        proxy_pass $upstream_back$request_uri;
         proxy_pass_header Server;
         proxy_set_header Host $http_host;
         proxy_redirect off;
@@ -36,7 +42,8 @@ server {
 
     # Static files - proxied to backend (whitenoise serves them)
     location /static/ {
-        proxy_pass http://taiga-back.railway.internal:8000/static/;
+        set $upstream_back http://taiga-back.railway.internal:8000;
+        proxy_pass $upstream_back$request_uri;
         proxy_pass_header Server;
         proxy_set_header Host $http_host;
         proxy_redirect off;
@@ -46,7 +53,8 @@ server {
 
     # Media files - proxied to backend (Django serves them)
     location /media/ {
-        proxy_pass http://taiga-back.railway.internal:8000;
+        set $upstream_back http://taiga-back.railway.internal:8000;
+        proxy_pass $upstream_back$request_uri;
         proxy_pass_header Server;
         proxy_set_header Host $http_host;
         proxy_redirect off;

@@ -1,6 +1,10 @@
 # Custom URL configuration for Railway deployment
 from taiga.urls import *  # noqa
 from django.conf import settings
+from django.urls import path, include
+
+# Grappelli related-lookup URLs (required for admin foreign key widgets)
+urlpatterns = [path('grappelli/', include('grappelli.urls'))] + urlpatterns
 
 # Only serve media locally if NOT using external storage (R2)
 if not getattr(settings, 'AWS_STORAGE_BUCKET_NAME', None):
