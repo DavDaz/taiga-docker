@@ -31,7 +31,13 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
 )]
 
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+from whitenoise.storage import CompressedManifestStaticFilesStorage as _WhiteNoiseManifestStorage
+
+class _LaxManifestStorage(_WhiteNoiseManifestStorage):
+    """manifest_strict=False: archivos ausentes del manifest devuelven URL cruda en vez de ValueError."""
+    manifest_strict = False
+
+STATICFILES_STORAGE = "settings.config._LaxManifestStorage"
 
 # --------------------------------------------------------------------------
 # URL configuration - use custom urls that include media serving
@@ -103,6 +109,7 @@ EMAIL_HOST = os.getenv("EMAIL_HOST", "")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_TIMEOUT = 15  # seconds — prevents worker from hanging on SMTP connect
 
 # --------------------------------------------------------------------------
 # Telemetry
