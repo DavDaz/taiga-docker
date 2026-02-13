@@ -102,7 +102,18 @@ MIDDLEWARE = [
 ] + [m for m in MIDDLEWARE if m not in (
     "django.middleware.security.SecurityMiddleware",
 )]
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+from whitenoise.storage import CompressedManifestStaticFilesStorage as _WhiteNoiseManifestStorage
+
+class _LaxManifestStorage(_WhiteNoiseManifestStorage):
+    """manifest_strict=False: archivos ausentes del manifest no lanza ValueError."""
+    manifest_strict = False
+
+STATICFILES_STORAGE = "settings.config._LaxManifestStorage"
+# OBLIGATORIO: common.py define STATIC_URL con hostname absoluto.
+# WhiteNoise necesita una URL relativa para interceptar peticiones /static/...
+# Sin esto, Django admin carga el HTML pero sin CSS (404 en todos los .css/.js).
+STATIC_URL = "/static/"
 
 # --- URLs custom con media serving ---
 ROOT_URLCONF = "settings.urls_railway"
@@ -481,6 +492,7 @@ Para enviar emails necesitas un **App Password** de Gmail (no la password normal
 | *"Algo no va bien"* en la UI | TAIGA_SITES_DOMAIN no coincide con URL actual | Las 2 variables deben apuntar al mismo dominio |
 | `Invalid variable format: KEY=` | Railway no acepta valores vacios | Omitir la variable |
 | Error 404 en `/api/v1/user-storage/...` | Normal: usuario nuevo sin preferencias guardadas | Ignorar, desaparece con el uso |
+| Django admin carga sin CSS/JS (grappelli muestra "Taiga Admin" pero en blanco) | `common.py` define `STATIC_URL` con hostname absoluto; WhiteNoise no intercepta `/static/...` y devuelve 404 | Agregar `STATIC_URL = "/static/"` en `config.py` después de `STATICFILES_STORAGE` |
 
 ---
 

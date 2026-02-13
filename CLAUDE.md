@@ -199,3 +199,4 @@ railway variables --set "TAIGA_URL=https://taiga.example.com" --service taiga-fr
 4. **Missing --path-as-root**: Railway deploys fail without this flag
 5. **Celery Not Disabled**: Backend hangs on requests if Celery settings aren't overridden
 6. **Events Backend Wrong**: Use `"postgresql"` not `"pg"` for events backend
+7. **Django Admin CSS Missing**: `common.py` sets `STATIC_URL` to an absolute URL with hostname. WhiteNoise needs a relative path to intercept `/static/...` requests. Without `STATIC_URL = "/static/"` in `config.py`, the admin loads HTML but returns 404 for all CSS/JS. Fix: `config.py` must have `STATIC_URL = "/static/"` after `STATICFILES_STORAGE`.
