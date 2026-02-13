@@ -1,7 +1,7 @@
 FROM taigaio/taiga-back:latest
 
 # Install whitenoise for serving static files without shared volumes
-RUN pip install whitenoise django-storages[s3] boto3
+RUN pip install "Django<4" whitenoise django-storages[s3] boto3 "django-grappelli>=3.0,<4.0"
 
 # Custom config for Railway deployment
 COPY config.py /taiga-back/settings/config.py
