@@ -38,6 +38,7 @@ class _LaxManifestStorage(_WhiteNoiseManifestStorage):
     manifest_strict = False
 
 STATICFILES_STORAGE = "settings.config._LaxManifestStorage"
+STATIC_URL = "/static/"
 
 # --------------------------------------------------------------------------
 # URL configuration - use custom urls that include media serving
@@ -115,3 +116,14 @@ EMAIL_TIMEOUT = 15  # seconds — prevents worker from hanging on SMTP connect
 # Telemetry
 # --------------------------------------------------------------------------
 ENABLE_TELEMETRY = os.getenv("ENABLE_TELEMETRY", "True") == "True"
+
+# --------------------------------------------------------------------------
+# Public registration
+# --------------------------------------------------------------------------
+PUBLIC_REGISTER_ENABLED = os.getenv("PUBLIC_REGISTER_ENABLED", "True") == "True"
+
+# --------------------------------------------------------------------------
+# Django Grappelli - modern admin skin (replaces templates, no permission hooks)
+# --------------------------------------------------------------------------
+INSTALLED_APPS = ["grappelli"] + list(INSTALLED_APPS)
+GRAPPELLI_ADMIN_TITLE = "Taiga Admin"
