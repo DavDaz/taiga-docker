@@ -10,6 +10,11 @@
         "TAIGA_PASSWORD": "${TAIGA_PASSWORD}",
         "TAIGA_TOKEN": "${TAIGA_TOKEN}"
       }
+    },
+    "railway": {
+      "type": "local",
+      "command": ["npx", "@railway/mcp-server"],
+      "enabled": true
     }
   }
 }
