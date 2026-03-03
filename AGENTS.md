@@ -75,10 +75,13 @@ When performing these actions, ALWAYS invoke the corresponding skill FIRST:
 |--------|-------|
 | Adding or modifying Django settings overrides | `django-drf` |
 | After creating/modifying a skill | `skill-sync` |
+| Checking Railway build/deploy logs | `railway-mcp` |
 | Creating test fixtures or mocks for Django code | `pytest` |
+| Deploying or redeploying Railway services | `railway-mcp` |
 | Editing config.py or urls_railway.py | `django-drf` |
 | Regenerate AGENTS.md Auto-invoke tables (sync.sh) | `skill-sync` |
 | Troubleshoot why a skill is missing from AGENTS.md auto-invoke | `skill-sync` |
+| Troubleshooting 502/504 or runtime errors on Railway | `railway-mcp` |
 | Writing Python code for taiga-back or taiga-async | `django-drf` |
 | Writing Python test scripts or utilities | `pytest` |
 
