@@ -49,7 +49,38 @@ railway/
   DEPLOY_GUIDE.md          # Full deployment walkthrough
   BACKUP_GUIDE.md          # Database backup procedures
   R2_STORAGE_GUIDE.md      # Cloudflare R2 setup guide
+skills/
+  django-drf/SKILL.md      # Django REST Framework patterns
+  pytest/SKILL.md          # Python testing patterns
 ```
+
+---
+
+## Skills
+
+Local skills live in `skills/`. Load them BEFORE writing any Python or making config changes.
+
+| Context | Load this skill |
+|---|---|
+| Editing `config.py`, `urls_railway.py`, Django settings | `skills/django-drf/SKILL.md` |
+| Writing Python scripts or test utilities | `skills/pytest/SKILL.md` |
+
+**How to load**: Read the SKILL.md file completely before writing code. Apply ALL patterns in it.
+
+### Auto-invoke Skills
+
+When performing these actions, ALWAYS invoke the corresponding skill FIRST:
+
+| Action | Skill |
+|--------|-------|
+| Adding or modifying Django settings overrides | `django-drf` |
+| After creating/modifying a skill | `skill-sync` |
+| Creating test fixtures or mocks for Django code | `pytest` |
+| Editing config.py or urls_railway.py | `django-drf` |
+| Regenerate AGENTS.md Auto-invoke tables (sync.sh) | `skill-sync` |
+| Troubleshoot why a skill is missing from AGENTS.md auto-invoke | `skill-sync` |
+| Writing Python code for taiga-back or taiga-async | `django-drf` |
+| Writing Python test scripts or utilities | `pytest` |
 
 ---
 
@@ -83,12 +114,102 @@ railway domain --service taiga-gateway
 
 ## Validation (no automated tests)
 
+> **There is no CI. Every change must be manually verified before considering it done.**
+
+### After deploying taiga-back
+
 ```bash
+# 1. Check build logs — look for import errors or missing env vars
 railway logs --service taiga-back
-railway logs --service taiga-gateway
-# Then verify manually:
+
+# 2. Verify the API responds
 curl -s https://your-domain.railway.app/api/v1/ | head -20
+
+# 3. Verify Django admin loads (CSS must render — not just HTML)
+curl -s https://your-domain.railway.app/admin/ | grep -i "django"
+
+# 4. Check static files are served by WhiteNoise (not 404)
+curl -I https://your-domain.railway.app/static/admin/css/base.css
 ```
+
+### After deploying taiga-front
+
+```bash
+# Restart gateway first — nginx caches IPs at boot
+railway service restart --service taiga-gateway --yes
+
+# Then verify the SPA loads
+curl -s https://your-domain.railway.app/ | grep -i "taiga"
+```
+
+### After deploying taiga-gateway
+
+```bash
+railway logs --service taiga-gateway
+
+# Verify upstream routing works end-to-end
+curl -s https://your-domain.railway.app/api/v1/
+curl -s https://your-domain.railway.app/
+```
+
+### Smoke test checklist
+
+- [ ] API responds at `/api/v1/`
+- [ ] Django admin loads with CSS at `/admin/`
+- [ ] Frontend SPA loads at `/`
+- [ ] Login works (verifies DB connection + CORS + TAIGA_SITES_DOMAIN)
+- [ ] No 504 errors (gateway upstream resolution)
+
+---
+
+## Debugging Guide
+
+> No CI, no tests — when something breaks, work systematically. Never guess.
+
+### Step 1 — Read logs before touching anything
+
+```bash
+railway logs --service taiga-back    # Django startup errors, import failures
+railway logs --service taiga-gateway # Nginx upstream errors, 502/504
+railway logs --service taiga-front   # Script errors in disable-events
+```
+
+### Step 2 — Identify which layer broke
+
+```
+Request → taiga-gateway (nginx) → taiga-back (Django) → PostgreSQL
+```
+
+| Symptom | Likely layer |
+|---|---|
+| 502 Bad Gateway | nginx can't reach taiga-back |
+| 504 Gateway Timeout | nginx IP cache stale — restart gateway |
+| 500 Internal Server Error | Django / config.py error |
+| Blank page, no errors | `TAIGA_SITES_DOMAIN` mismatch with `TAIGA_URL` |
+| Admin CSS missing | `STATIC_URL` wrong or WhiteNoise not intercepting |
+| Login fails silently | CORS, `TAIGA_SITES_DOMAIN`, or DB connection |
+
+### Step 3 — Check recent changes first
+
+```bash
+git diff HEAD~1
+```
+
+Most breakages come from a single wrong env var or a missing setting override in `config.py`.
+
+### Step 4 — Verify environment variables
+
+```bash
+railway variables --service taiga-back
+railway variables --service taiga-gateway
+```
+
+Cross-check against Critical Pitfalls below — especially `TAIGA_SITES_DOMAIN` vs `TAIGA_URL`.
+
+### Step 5 — Fix ONE thing at a time
+
+Do not stack multiple changes. Deploy, verify, then proceed. If 3+ fixes haven't worked,
+the problem is likely architectural — re-read the Critical Pitfalls section completely.
 
 ---
 
