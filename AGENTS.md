@@ -279,6 +279,68 @@ chore: bump to 6.9.0 version
 
 ---
 
+## MCP Integration
+
+AI agents can interact with Taiga directly via the Model Context Protocol (MCP) server included in `mcp/`.
+
+### Setup
+
+```bash
+# Install dependencies (once)
+pip install -r mcp/requirements.txt
+
+# Set required environment variables
+export TAIGA_URL=https://your-taiga-domain.railway.app
+export TAIGA_USERNAME=your-username
+export TAIGA_PASSWORD=your-password
+
+# Optional: use a pre-existing auth token instead of username/password
+export TAIGA_TOKEN=your-auth-token
+```
+
+The MCP server is registered in `.opencode.json` and starts automatically when OpenCode loads the project. No Railway changes required — the server runs locally and calls the existing Taiga REST API.
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `list_projects` | List all accessible Taiga projects (returns id, name, slug) |
+| `create_issue` | Create a new issue in a project |
+| `move_status` | Update an issue's status by name (e.g. "In progress", "Done") |
+| `add_comment` | Add a comment to an issue |
+| `assign_user` | Assign a team member to an issue by username |
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `TAIGA_URL` | Yes | Base URL of your Taiga deployment (e.g. `https://taiga.railway.app`) |
+| `TAIGA_USERNAME` | If no TOKEN | Your Taiga username |
+| `TAIGA_PASSWORD` | If no TOKEN | Your Taiga password |
+| `TAIGA_TOKEN` | Optional | Pre-existing auth token (skips username/password auth) |
+
+### Known Limitations
+
+- Comments use PATCH on the issue resource — Taiga requires the current `version` field to prevent conflicts
+- `move_status` resolves status names case-insensitively; use the exact name from your project's board
+- `assign_user` requires the Taiga username (not display name) of the team member
+- No WebSocket/events support — this MCP operates on REST API only
+
+### File Structure
+
+```
+mcp/
+  taiga_mcp/
+    __init__.py     # package marker
+    client.py       # HTTP client with lazy auth
+    server.py       # FastMCP server with 5 tools
+  requirements.txt  # mcp>=1.0, httpx>=0.27
+  run.sh            # wrapper script (handles cwd for OpenCode)
+.opencode.json      # MCP server registration (project-level)
+```
+
+---
+
 ## Contributing
 
 - GitHub issues and PRs

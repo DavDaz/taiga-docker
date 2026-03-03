@@ -1,0 +1,15 @@
+{
+  "mcp": {
+    "taiga": {
+      "type": "local",
+      "command": ["sh", "mcp/run.sh"],
+      "enabled": true,
+      "env": {
+        "TAIGA_URL": "${TAIGA_URL}",
+        "TAIGA_USERNAME": "${TAIGA_USERNAME}",
+        "TAIGA_PASSWORD": "${TAIGA_PASSWORD}",
+        "TAIGA_TOKEN": "${TAIGA_TOKEN}"
+      }
+    }
+  }
+}
