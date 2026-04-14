@@ -86,7 +86,7 @@ Patterns tailored for Prowler development:
 | Skill | Description |
 |-------|-------------|
 | `skill-creator` | Create new AI agent skills |
-| `skill-sync` | Sync skill metadata to AGENTS.md Auto-invoke sections |
+| `skill-sync` | Sync skill metadata to CLAUDE.md Auto-invoke sections |
 
 ## Directory Structure
 
@@ -112,7 +112,7 @@ skills/
 ./skills/skill-sync/assets/sync.sh
 ```
 
-This reads `metadata.scope` and `metadata.auto_invoke` from each `SKILL.md` and generates the Auto-invoke tables in the corresponding `AGENTS.md` files.
+This reads `metadata.scope` and `metadata.auto_invoke` from each `SKILL.md` and generates the Auto-invoke tables in the corresponding `CLAUDE.md` files.
 
 ## Creating New Skills
 
@@ -129,8 +129,8 @@ Read skills/skill-creator/SKILL.md
 3. Add `metadata.scope` and `metadata.auto_invoke` fields
 4. Keep content concise (under 500 lines)
 5. Reference existing docs instead of duplicating
-6. Run `./skills/skill-sync/assets/sync.sh` to update AGENTS.md
-7. Add to `AGENTS.md` skills table (if not auto-generated)
+6. Run `./skills/skill-sync/assets/sync.sh` to update CLAUDE.md
+7. Add to `CLAUDE.md` skills table (if not auto-generated)
 
 ## Design Principles
 
@@ -144,4 +144,4 @@ Read skills/skill-creator/SKILL.md
 - [Agent Skills Standard](https://agentskills.io) - Open standard specification
 - [Agent Skills GitHub](https://github.com/anthropics/skills) - Example skills
 - [Claude Code Best Practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices) - Skill authoring guide
-- [Prowler AGENTS.md](../AGENTS.md) - AI agent general rules
+- [CLAUDE.md](../CLAUDE.md) - AI agent general rules (source of truth)

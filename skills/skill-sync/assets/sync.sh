@@ -7,6 +7,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$(dirname "$(dirname "$SCRIPT_DIR")")")"
 SKILLS_DIR="$REPO_ROOT/skills"
+CLAUDE_SKILLS_DIR="$REPO_ROOT/.claude/skills"
 
 # Colors
 RED='\033[0;31m'
@@ -49,11 +50,11 @@ done
 get_agents_path() {
     local scope="$1"
     case "$scope" in
-        root)       echo "$REPO_ROOT/AGENTS.md" ;;
-        ui)         echo "$REPO_ROOT/ui/AGENTS.md" ;;
-        api)        echo "$REPO_ROOT/api/AGENTS.md" ;;
-        sdk)        echo "$REPO_ROOT/prowler/AGENTS.md" ;;
-        mcp_server) echo "$REPO_ROOT/mcp_server/AGENTS.md" ;;
+        root)       echo "$REPO_ROOT/CLAUDE.md" ;;
+        ui)         echo "$REPO_ROOT/ui/CLAUDE.md" ;;
+        api)        echo "$REPO_ROOT/api/CLAUDE.md" ;;
+        sdk)        echo "$REPO_ROOT/prowler/CLAUDE.md" ;;
+        mcp_server) echo "$REPO_ROOT/mcp_server/CLAUDE.md" ;;
         *)          echo "" ;;
     esac
 }
@@ -158,12 +159,13 @@ extract_metadata() {
     ' "$file"
 }
 
-echo -e "${BLUE}Skill Sync - Updating AGENTS.md Auto-invoke sections${NC}"
+echo -e "${BLUE}Skill Sync - Updating CLAUDE.md Auto-invoke sections${NC}"
 echo "========================================================"
 echo ""
 
 # Collect skills by scope
-declare -A SCOPE_SKILLS  # scope -> "skill1:action1|skill2:action2|..."
+# Dynamic variables instead of associative arrays (bash 3.2 compatible)
+SCOPE_KEYS=""  # space-separated list of known scopes
 
 # Deterministic iteration order (stable diffs)
 # Note: macOS ships BSD find; avoid GNU-only flags.
@@ -193,31 +195,38 @@ while IFS= read -r skill_file; do
         # Filter by scope if specified
         [ -n "$FILTER_SCOPE" ] && [ "$scope" != "$FILTER_SCOPE" ] && continue
 
-        # Append to scope's skill list
-        if [ -z "${SCOPE_SKILLS[$scope]}" ]; then
-            SCOPE_SKILLS[$scope]="$skill_name:$auto_invoke"
+        # Track known scopes (dedup)
+        case " $SCOPE_KEYS " in
+            *" $scope "*) ;;
+            *) SCOPE_KEYS="$SCOPE_KEYS $scope" ;;
+        esac
+
+        # Append to scope's skill list via dynamic variable
+        eval "current_val=\"\$SCOPE_${scope}\""
+        if [ -z "$current_val" ]; then
+            eval "SCOPE_${scope}=\"\$skill_name:\$auto_invoke\""
         else
-            SCOPE_SKILLS[$scope]="${SCOPE_SKILLS[$scope]}|$skill_name:$auto_invoke"
+            eval "SCOPE_${scope}=\"\${current_val}|\$skill_name:\$auto_invoke\""
         fi
     done
-done < <(find "$SKILLS_DIR" -mindepth 2 -maxdepth 2 -name SKILL.md -print | sort)
+done < <(
+    { find "$SKILLS_DIR" -mindepth 2 -maxdepth 2 -name SKILL.md -print 2>/dev/null
+      [ -d "$CLAUDE_SKILLS_DIR" ] && find -L "$CLAUDE_SKILLS_DIR" -mindepth 2 -maxdepth 2 -name SKILL.md -print 2>/dev/null
+      true; } | sort -u
+)
 
 # Generate Auto-invoke section for each scope
 # Deterministic scope order (stable diffs)
-scopes_sorted=()
 while IFS= read -r scope; do
-    scopes_sorted+=("$scope")
-done < <(printf "%s\n" "${!SCOPE_SKILLS[@]}" | sort)
-
-for scope in "${scopes_sorted[@]}"; do
+    [ -z "$scope" ] && continue
     agents_path=$(get_agents_path "$scope")
 
     if [ -z "$agents_path" ] || [ ! -f "$agents_path" ]; then
-        echo -e "${YELLOW}Warning: No AGENTS.md found for scope '$scope'${NC}"
+        echo -e "${YELLOW}Warning: No CLAUDE.md found for scope '$scope'${NC}"
         continue
     fi
 
-    echo -e "${BLUE}Processing: $scope -> $(basename "$(dirname "$agents_path")")/AGENTS.md${NC}"
+    echo -e "${BLUE}Processing: $scope -> $(basename "$(dirname "$agents_path")")/CLAUDE.md${NC}"
 
     # Build the Auto-invoke table
     auto_invoke_section="### Auto-invoke Skills
@@ -230,7 +239,8 @@ When performing these actions, ALWAYS invoke the corresponding skill FIRST:
     # Expand into sortable rows: "action<TAB>skill"
     rows=()
 
-    IFS='|' read -ra skill_entries <<< "${SCOPE_SKILLS[$scope]}"
+    eval "scope_data=\"\$SCOPE_${scope}\""
+    IFS='|' read -ra skill_entries <<< "$scope_data"
     for entry in "${skill_entries[@]}"; do
         skill_name="${entry%%:*}"
         actions_raw="${entry#*:}"
@@ -301,7 +311,7 @@ When performing these actions, ALWAYS invoke the corresponding skill FIRST:
 
         rm -f "$section_file"
     fi
-done
+done < <(echo "$SCOPE_KEYS" | tr ' ' '\n' | grep -v '^$' | sort)
 
 echo ""
 echo -e "${GREEN}Done!${NC}"
@@ -321,7 +331,11 @@ while IFS= read -r skill_file; do
         echo -e "  ${YELLOW}$skill_name${NC} - missing: ${scope_raw:+}${scope_raw:-scope} ${auto_invoke:+}${auto_invoke:-auto_invoke}"
         missing=$((missing + 1))
     fi
-done < <(find "$SKILLS_DIR" -mindepth 2 -maxdepth 2 -name SKILL.md -print | sort)
+done < <(
+    { find "$SKILLS_DIR" -mindepth 2 -maxdepth 2 -name SKILL.md -print 2>/dev/null
+      [ -d "$CLAUDE_SKILLS_DIR" ] && find -L "$CLAUDE_SKILLS_DIR" -mindepth 2 -maxdepth 2 -name SKILL.md -print 2>/dev/null
+      true; } | sort -u
+)
 
 if [ $missing -eq 0 ]; then
     echo -e "  ${GREEN}All skills have sync metadata${NC}"

@@ -1,10 +1,15 @@
 {
   "version": 1,
   "skills": {
+    "django-expert": {
+      "source": "vintasoftware/django-ai-plugins",
+      "sourceType": "github",
+      "computedHash": "a6b8c224017570496d688a526fcbea74025a01cc90d9afb0977bfcc1f76af306"
+    },
     "use-railway": {
       "source": "railwayapp/railway-skills",
       "sourceType": "github",
-      "computedHash": "cb99ff7cb24ce7c6136feb65e279a110389e0ee743d2e040f65f618c446c68a2"
+      "computedHash": "c1a12a7b4914878399c0d634c49498fdb3bff1d91ef2c125932491bde3a4190a"
     }
   }
 }

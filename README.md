@@ -38,6 +38,35 @@ taiga-gateway (nginx)
 
 ---
 
+## Prerequisites
+
+### Railway CLI
+
+Install the Railway CLI before running any `railway` command:
+
+```bash
+# Homebrew (macOS)
+brew install railway
+
+# npm
+npm i -g @railway/cli
+```
+
+Authenticate and link your project:
+
+```bash
+railway login
+railway link   # select workspace, project, and environment interactively
+```
+
+Verify the context is correct before deploying:
+
+```bash
+railway status --json
+```
+
+---
+
 ## Deploy
 
 > **CRITICAL**: `--path-as-root` is required on every `railway up` command.

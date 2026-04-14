@@ -1,8 +1,8 @@
 ---
 name: skill-sync
 description: >
-  Syncs skill metadata to AGENTS.md Auto-invoke sections.
-  Trigger: When updating skill metadata (metadata.scope/metadata.auto_invoke), regenerating Auto-invoke tables, or running ./skills/skill-sync/assets/sync.sh (including --dry-run/--scope).
+  Syncs skill metadata to CLAUDE.md Auto-invoke sections.
+  Trigger: When updating skill metadata (metadata.scope/metadata.auto_invoke), registering a newly downloaded skill, regenerating Auto-invoke tables, or running ./skills/skill-sync/assets/sync.sh (including --dry-run/--scope).
 license: Apache-2.0
 metadata:
   author: prowler-cloud
@@ -10,14 +10,14 @@ metadata:
   scope: [root]
   auto_invoke:
     - "After creating/modifying a skill"
-    - "Regenerate AGENTS.md Auto-invoke tables (sync.sh)"
-    - "Troubleshoot why a skill is missing from AGENTS.md auto-invoke"
+    - "Regenerate CLAUDE.md Auto-invoke tables (sync.sh)"
+    - "Troubleshoot why a skill is missing from CLAUDE.md auto-invoke"
 allowed-tools: Read, Edit, Write, Glob, Grep, Bash
 ---
 
 ## Purpose
 
-Keeps AGENTS.md Auto-invoke sections in sync with skill metadata. When you create or modify a skill, run the sync script to automatically update all affected AGENTS.md files.
+Keeps CLAUDE.md Auto-invoke sections in sync with skill metadata. When you create or modify a skill, run the sync script to automatically update all affected CLAUDE.md files.
 
 ## Required Skill Metadata
 
@@ -44,11 +44,11 @@ metadata:
 
 | Scope | Updates |
 |-------|---------|
-| `root` | `AGENTS.md` (repo root) |
-| `ui` | `ui/AGENTS.md` |
-| `api` | `api/AGENTS.md` |
-| `sdk` | `prowler/AGENTS.md` |
-| `mcp_server` | `mcp_server/AGENTS.md` |
+| `root` | `CLAUDE.md` (repo root) |
+| `ui` | `ui/CLAUDE.md` |
+| `api` | `api/CLAUDE.md` |
+| `sdk` | `prowler/CLAUDE.md` |
+| `mcp_server` | `mcp_server/CLAUDE.md` |
 
 Skills can have multiple scopes: `scope: [ui, api]`
 
@@ -84,7 +84,7 @@ metadata:
   auto_invoke: "Creating/modifying React components"
 ```
 
-The sync script generates in `ui/AGENTS.md`:
+The sync script generates in `ui/CLAUDE.md`:
 
 ```markdown
 ### Auto-invoke Skills
@@ -101,14 +101,51 @@ When performing these actions, ALWAYS invoke the corresponding skill FIRST:
 ## Commands
 
 ```bash
-# Sync all AGENTS.md files
+# Sync all CLAUDE.md files
 ./skills/skill-sync/assets/sync.sh
 
 # Dry run (show what would change)
 ./skills/skill-sync/assets/sync.sh --dry-run
 
 # Sync specific scope only
-./skills/skill-sync/assets/sync.sh --scope ui
+./skills/skill-sync/assets/sync.sh --scope root
+```
+
+---
+
+## Registering a Downloaded Skill
+
+Skills downloaded via `npx` don't include `metadata.scope` or `metadata.auto_invoke` — those are project-specific. When `sync.sh` reports a skill as missing metadata, follow this flow:
+
+### Step 1 — Read the skill
+```bash
+cat .claude/skills/{skill-name}/SKILL.md
+```
+Understand what the skill does and when it should be used.
+
+### Step 2 — Determine scope
+For this project, always `root` (single CLAUDE.md at repo root).
+
+### Step 3 — Ask the user
+Show the skill's description and ask:
+> "¿Cuándo querés que se invoque esta skill automáticamente? Describí las acciones que la deben disparar."
+
+### Step 4 — Add metadata block
+Add to the skill's frontmatter (after `allowed-tools` if present, otherwise after `license`):
+
+```yaml
+metadata:
+  author: {keep existing or use your name}
+  version: "1.0"
+  scope: [root]
+  auto_invoke:
+    - "Action that triggers this skill"
+    - "Another triggering action"
+```
+
+### Step 5 — Run sync
+```bash
+bash skills/skill-sync/assets/sync.sh
 ```
 
 ---
@@ -118,4 +155,4 @@ When performing these actions, ALWAYS invoke the corresponding skill FIRST:
 - [ ] Added `metadata.scope` to new/modified skill
 - [ ] Added `metadata.auto_invoke` with action description
 - [ ] Ran `./skills/skill-sync/assets/sync.sh`
-- [ ] Verified AGENTS.md files updated correctly
+- [ ] Verified CLAUDE.md files updated correctly

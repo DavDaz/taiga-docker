@@ -7,6 +7,9 @@ RUN pip install "Django<4" whitenoise django-storages[s3] boto3 "django-grappell
 COPY config.py /taiga-back/settings/config.py
 COPY urls_railway.py /taiga-back/settings/urls_railway.py
 
+# Mini app: thumbnail generation signal for S3/R2 storage
+COPY taiga_railway/ /taiga-back/taiga_railway/
+
 # Generate staticfiles manifest required by CompressedManifestStaticFilesStorage.
 # Dummy env vars: collectstatic is a filesystem op, does not connect to the DB.
 RUN cd /taiga-back && \

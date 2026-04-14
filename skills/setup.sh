@@ -118,9 +118,7 @@ setup_claude() {
 
     ln -s "$SKILLS_SOURCE" "$target"
     echo -e "${GREEN}  ✓ .claude/skills -> skills/${NC}"
-
-    # Copy AGENTS.md to CLAUDE.md
-    copy_agents_md "CLAUDE.md"
+    echo -e "${GREEN}  ✓ Claude Code uses CLAUDE.md natively${NC}"
 }
 
 setup_gemini() {
@@ -139,8 +137,8 @@ setup_gemini() {
     ln -s "$SKILLS_SOURCE" "$target"
     echo -e "${GREEN}  ✓ .gemini/skills -> skills/${NC}"
 
-    # Copy AGENTS.md to GEMINI.md
-    copy_agents_md "GEMINI.md"
+    # Copy CLAUDE.md to GEMINI.md
+    copy_claude_md "GEMINI.md"
 }
 
 setup_codex() {
@@ -158,32 +156,34 @@ setup_codex() {
 
     ln -s "$SKILLS_SOURCE" "$target"
     echo -e "${GREEN}  ✓ .codex/skills -> skills/${NC}"
-    echo -e "${GREEN}  ✓ Codex uses AGENTS.md natively${NC}"
+
+    # Copy CLAUDE.md to AGENTS.md for native Codex support
+    copy_claude_md "AGENTS.md"
 }
 
 setup_copilot() {
-    if [ -f "$REPO_ROOT/AGENTS.md" ]; then
+    if [ -f "$REPO_ROOT/CLAUDE.md" ]; then
         mkdir -p "$REPO_ROOT/.github"
-        cp "$REPO_ROOT/AGENTS.md" "$REPO_ROOT/.github/copilot-instructions.md"
-        echo -e "${GREEN}  ✓ AGENTS.md -> .github/copilot-instructions.md${NC}"
+        cp "$REPO_ROOT/CLAUDE.md" "$REPO_ROOT/.github/copilot-instructions.md"
+        echo -e "${GREEN}  ✓ CLAUDE.md -> .github/copilot-instructions.md${NC}"
     fi
 }
 
-copy_agents_md() {
+copy_claude_md() {
     local target_name="$1"
-    local agents_files
+    local claude_files
     local count=0
 
-    agents_files=$(find "$REPO_ROOT" -name "AGENTS.md" -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null)
+    claude_files=$(find "$REPO_ROOT" -name "CLAUDE.md" -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null)
 
-    for agents_file in $agents_files; do
-        local agents_dir
-        agents_dir=$(dirname "$agents_file")
-        cp "$agents_file" "$agents_dir/$target_name"
+    for claude_file in $claude_files; do
+        local claude_dir
+        claude_dir=$(dirname "$claude_file")
+        cp "$claude_file" "$claude_dir/$target_name"
         count=$((count + 1))
     done
 
-    echo -e "${GREEN}  ✓ Copied $count AGENTS.md -> $target_name${NC}"
+    echo -e "${GREEN}  ✓ Copied $count CLAUDE.md -> $target_name${NC}"
 }
 
 # =============================================================================
@@ -296,10 +296,10 @@ echo ""
 echo -e "${GREEN}✅ Successfully configured $SKILL_COUNT AI skills!${NC}"
 echo ""
 echo "Configured:"
-[ "$SETUP_CLAUDE" = true ] && echo "  • Claude Code:    .claude/skills/ + CLAUDE.md"
-[ "$SETUP_CODEX" = true ] && echo "  • Codex (OpenAI): .codex/skills/ + AGENTS.md (native)"
-[ "$SETUP_GEMINI" = true ] && echo "  • Gemini CLI:     .gemini/skills/ + GEMINI.md"
-[ "$SETUP_COPILOT" = true ] && echo "  • GitHub Copilot: .github/copilot-instructions.md"
+[ "$SETUP_CLAUDE" = true ] && echo "  • Claude Code:    .claude/skills/ + CLAUDE.md (native)"
+[ "$SETUP_CODEX" = true ] && echo "  • Codex (OpenAI): .codex/skills/ + AGENTS.md (copied from CLAUDE.md)"
+[ "$SETUP_GEMINI" = true ] && echo "  • Gemini CLI:     .gemini/skills/ + GEMINI.md (copied from CLAUDE.md)"
+[ "$SETUP_COPILOT" = true ] && echo "  • GitHub Copilot: .github/copilot-instructions.md (copied from CLAUDE.md)"
 echo ""
 echo -e "${BLUE}Note: Restart your AI assistant to load the skills.${NC}"
-echo -e "${BLUE}      AGENTS.md is the source of truth - edit it, then re-run this script.${NC}"
+echo -e "${BLUE}      CLAUDE.md is the source of truth - edit it, then re-run this script.${NC}"
