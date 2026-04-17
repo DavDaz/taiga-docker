@@ -8,6 +8,18 @@
 - For detailed deployment/config workflows, load the `use-railway` skill on-demand.
 - For deeper guides, see `railway/DEPLOY_GUIDE.md`, `railway/BACKUP_GUIDE.md`, and `railway/R2_STORAGE_GUIDE.md`.
 
+## Prerequisites (New Machine Setup)
+
+Before working with this repo on a new machine, register the Railway MCP server in Claude Code:
+
+```bash
+claude mcp add railway --transport http https://mcp.railway.com
+```
+
+This gives Claude Code direct access to Railway deployments, logs, variables, and services — required for all operations in this project.
+
+---
+
 ## Critical Context
 
 - **This project does NOT run locally.** There is no `docker-compose up`, no local dev server.
