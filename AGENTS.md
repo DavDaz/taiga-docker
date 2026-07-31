@@ -284,24 +284,17 @@ chore: bump to 6.9.0 version
 
 ## MCP Integration
 
-AI agents can interact with Taiga directly via the Model Context Protocol (MCP) server included in `mcp/`.
+AI agents can interact with Taiga through the local stdio MCP server in `mcp/`. See [`mcp/README.md`](mcp/README.md) for secure setup, client registration, verification, and credential rotation.
 
 ### Setup
 
 ```bash
-# Install dependencies (once)
-pip install -r mcp/requirements.txt
-
-# Set required environment variables
-export TAIGA_URL=https://your-taiga-domain.railway.app
-export TAIGA_USERNAME=your-username
-export TAIGA_PASSWORD=your-password
-
-# Optional: use a pre-existing auth token instead of username/password
-export TAIGA_TOKEN=your-auth-token
+python3 -m venv mcp/.venv
+mcp/.venv/bin/python -m pip install -r mcp/requirements.txt
+umask 077 && touch mcp/.env && chmod 600 mcp/.env
 ```
 
-The MCP server is registered in `.opencode.json` and starts automatically when OpenCode loads the project. No Railway changes required — the server runs locally and calls the existing Taiga REST API.
+Store only the allowlisted Taiga variables in `mcp/.env`; never commit or share that file. `opencode.json` registers the server for this workspace. Other AI clients require independent registration as documented in the guide. No Railway changes are required.
 
 ### Available Tools
 
@@ -312,15 +305,6 @@ The MCP server is registered in `.opencode.json` and starts automatically when O
 | `move_status` | Update an issue's status by name (e.g. "In progress", "Done") |
 | `add_comment` | Add a comment to an issue |
 | `assign_user` | Assign a team member to an issue by username |
-
-### Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `TAIGA_URL` | Yes | Base URL of your Taiga deployment (e.g. `https://taiga.railway.app`) |
-| `TAIGA_USERNAME` | If no TOKEN | Your Taiga username |
-| `TAIGA_PASSWORD` | If no TOKEN | Your Taiga password |
-| `TAIGA_TOKEN` | Optional | Pre-existing auth token (skips username/password auth) |
 
 ### Known Limitations
 
@@ -336,10 +320,13 @@ mcp/
   taiga_mcp/
     __init__.py     # package marker
     client.py       # HTTP client with lazy auth
+    launcher.py     # secure credential loader and process entry point
     server.py       # FastMCP server with 5 tools
+  tests/            # credential-loader tests using temporary files
+  README.md         # setup and client registration guide
   requirements.txt  # mcp>=1.0, httpx>=0.27
-  run.sh            # wrapper script (handles cwd for OpenCode)
-.opencode.json      # MCP server registration (project-level)
+  run.sh            # POSIX wrapper for the Python launcher
+opencode.json       # MCP server registration (project-level)
 ```
 
 ---
