@@ -32,7 +32,8 @@ def list_projects() -> list[dict]:
     Returns a list of projects with id, name, and slug.
     """
     client = get_client()
-    projects = client.get("/api/v1/projects?member=me")
+    user = client.get("/api/v1/users/me")
+    projects = client.get(f"/api/v1/projects?member={user['id']}")
     return [{"id": p["id"], "name": p["name"], "slug": p["slug"]} for p in projects]
 
 

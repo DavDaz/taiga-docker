@@ -1,2 +1,4 @@
 db-data
 static-data
+mcp/.venv/
+mcp/.env
