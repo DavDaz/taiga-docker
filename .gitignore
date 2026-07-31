@@ -2,3 +2,12 @@ db-data
 static-data
 mcp/.venv/
 mcp/.env
+.playwright-mcp/
+backups/
+.atl/
+.codegraph/
+.engram/
+.DS_Store
+**/.DS_Store
+**/__pycache__/
+*.py[cod]

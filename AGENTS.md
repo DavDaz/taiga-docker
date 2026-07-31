@@ -35,6 +35,7 @@ railway/
     urls_railway.py        # Custom URLs (grappelli admin + media serving endpoint)
     Dockerfile             # Installs whitenoise, grappelli, django-storages[s3]
     base_site.html         # Custom Django admin branding template
+    taiga_railway/         # Railway-specific Django app (R2 thumbnail signals)
   taiga-front/
     Dockerfile             # Copies disable-events script
     99-disable-events.sh   # Sets eventsUrl=null in conf.json (no taiga-events)
@@ -52,6 +53,9 @@ railway/
 skills/
   django-drf/SKILL.md      # Django REST Framework patterns
   pytest/SKILL.md          # Python testing patterns
+  railway-mcp/SKILL.md     # Railway MCP operations
+.agents/skills/
+  use-railway/SKILL.md     # Detailed Railway CLI workflows
 ```
 
 ---
@@ -64,6 +68,7 @@ Local skills live in `skills/`. Load them BEFORE writing any Python or making co
 |---|---|
 | Editing `config.py`, `urls_railway.py`, Django settings | `skills/django-drf/SKILL.md` |
 | Writing Python scripts or test utilities | `skills/pytest/SKILL.md` |
+| Railway CLI operations and troubleshooting | `.agents/skills/use-railway/SKILL.md` |
 
 **How to load**: Read the SKILL.md file completely before writing code. Apply ALL patterns in it.
 
@@ -84,6 +89,27 @@ When performing these actions, ALWAYS invoke the corresponding skill FIRST:
 | Troubleshooting 502/504 or runtime errors on Railway | `railway-mcp` |
 | Writing Python code for taiga-back or taiga-async | `django-drf` |
 | Writing Python test scripts or utilities | `pytest` |
+
+---
+
+## Railway Prerequisites
+
+Install the Railway CLI, authenticate, and verify that this repository is linked to the intended project and environment before running Railway commands:
+
+```bash
+brew install railway
+railway login
+railway link
+railway status --json
+```
+
+Claude Code users can also register Railway's hosted MCP server:
+
+```bash
+claude mcp add railway --transport http https://mcp.railway.com
+```
+
+Use `.agents/skills/use-railway/SKILL.md` for detailed Railway workflows. Do not deploy or mutate Railway merely to validate repository changes.
 
 ---
 

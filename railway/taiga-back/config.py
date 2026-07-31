@@ -71,6 +71,7 @@ if os.getenv("R2_ACCESS_KEY_ID"):
     AWS_DEFAULT_ACL = None          # R2 uses bucket-level public access
     AWS_S3_SIGNATURE_VERSION = "s3v4"
     AWS_QUERYSTRING_AUTH = False    # Public URLs without signing
+    AWS_S3_FILE_OVERWRITE = True    # Overwrite thumbnails on re-upload
 
     _r2_public_url = os.getenv("R2_PUBLIC_URL", "").rstrip("/")
     AWS_S3_CUSTOM_DOMAIN = _r2_public_url.replace("https://", "").replace("http://", "")
@@ -125,5 +126,5 @@ PUBLIC_REGISTER_ENABLED = os.getenv("PUBLIC_REGISTER_ENABLED", "True") == "True"
 # --------------------------------------------------------------------------
 # Django Grappelli - modern admin skin (replaces templates, no permission hooks)
 # --------------------------------------------------------------------------
-INSTALLED_APPS = ["grappelli"] + list(INSTALLED_APPS)
+INSTALLED_APPS = ["grappelli", "taiga_railway"] + list(INSTALLED_APPS)
 GRAPPELLI_ADMIN_TITLE = "Taiga Admin"
