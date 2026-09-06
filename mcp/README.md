@@ -1,6 +1,6 @@
 # Use Taiga from local AI clients
 
-This directory provides a local stdio MCP server for Taiga. It gives an AI client five project-management tools while keeping Taiga credentials in a local, Git-ignored file.
+This directory provides a local stdio MCP server for Taiga. It gives an AI client a narrow project-management and course-planning API while keeping Taiga credentials in a local, Git-ignored file.
 
 ## Tools
 
@@ -11,8 +11,30 @@ This directory provides a local stdio MCP server for Taiga. It gives an AI clien
 | `move_status` | Move an issue to a named status |
 | `add_comment` | Add a comment to an issue |
 | `assign_user` | Assign an issue to a project member by username |
+| `list_epics` | List concise epic details for one project |
+| `create_epic` | Create an epic in a project |
+| `create_user_story` | Create a user story in a project |
+| `link_story_to_epic` | Link an existing user story to an epic |
+| `list_milestones` | List project milestones (Taiga sprints) and their dates |
+| `create_milestone` | Create a dated milestone |
+| `update_milestone` | Update milestone name or dates with optimistic concurrency |
+| `list_user_stories` | List project stories, optionally for one milestone |
+| `update_user_story` | Update story status, milestone, tags, assignee, points, or order |
+| `create_task` | Create a task under a user story |
+| `list_tasks` | List project tasks, optionally for one user story |
+| `update_task` | Update task status, tags, assignee, or order |
+| `preview_course_plan` | Validate and deterministically preview a typed course plan with zero remote calls |
+| `apply_course_plan` | Idempotently reconcile a typed course plan |
 
-Only `list_projects` is read-only. Review the requested action before allowing an AI to call any other tool.
+The `list_*` and `preview_course_plan` tools are read-only. Review the requested action before allowing an AI to call any other tool.
+
+## Course-plan safety
+
+`preview_course_plan` validates dates, ordering, unique references, and the closed input schema without accessing Taiga. `apply_course_plan` repeats validation, resolves every supplied status, role, point value, and assignee before its first mutation, then reconciles one epic, dated milestones, granular stories, and their tasks.
+
+Managed objects receive stable subject prefixes such as `[course:create-with-code:story:lesson-1]`. Keep these markers intact: they are the idempotency keys that make retries update or skip existing objects instead of duplicating them. Apply stops after the first remote failure and returns bounded `created`, `updated`, `skipped`, and `failed` details; rerun the same plan to continue safely.
+
+Course-plan apply does not delete remote objects omitted from a later plan. This is intentional: destructive synchronization is outside this MCP's narrow safety boundary.
 
 ## Fresh-machine setup
 
@@ -110,7 +132,7 @@ Restart the AI client after registration, then inspect its MCP server list. Ask 
 Use Taiga list_projects and show only each project's ID, name, and slug.
 ```
 
-Expected tools are `list_projects`, `create_issue`, `move_status`, `add_comment`, and `assign_user`.
+The expected registry includes the issue and epic tools plus milestone, user-story, task, `preview_course_plan`, and `apply_course_plan` tools listed above. Restart the AI client whenever this registry changes; an already-running MCP process cannot discover newly added tools.
 
 Example write prompts, which require careful review:
 
@@ -118,6 +140,9 @@ Example write prompts, which require careful review:
 Create an issue in Taiga project 12 with subject "Document backup restore" and no description.
 Move Taiga issue 34 to "In progress".
 Assign Taiga issue 34 to username alex.
+List epics in Taiga project 12.
+Create an epic in Taiga project 12 with subject "Improve onboarding".
+Create a user story in Taiga project 12 with subject "Add setup checklist", then link it to epic 45.
 ```
 
 ## Troubleshooting
@@ -131,6 +156,7 @@ Assign Taiga issue 34 to username alex.
 | `TAIGA_URL` is required | Add it to `.env` or the controlled parent environment |
 | Authentication fails | Confirm the URL and credentials, or replace an expired token |
 | Client shows no tools | Confirm the absolute path, restart the client, and inspect its MCP status command |
+| New planning tools are missing | Fully restart the AI client so it launches a process with the current registry |
 
 The server communicates over stdout using MCP. Do not add debug prints to stdout; use secret-free stderr diagnostics only.
 
@@ -150,3 +176,7 @@ If a credential may have entered Git history, logs, screenshots, or chat, treat 
 - [Claude Code MCP](https://docs.anthropic.com/en/docs/claude-code/mcp)
 - [OpenAI Codex MCP](https://developers.openai.com/codex/extend/mcp/)
 - [Taiga REST API authentication](https://docs.taiga.io/api.html#_authentication)
+- [Taiga REST API epics](https://docs.taiga.io/api.html#epics)
+- [Taiga REST API user stories](https://docs.taiga.io/api.html#user-stories)
+- [Taiga REST API milestones](https://docs.taiga.io/api.html#milestones)
+- [Taiga REST API tasks](https://docs.taiga.io/api.html#tasks)

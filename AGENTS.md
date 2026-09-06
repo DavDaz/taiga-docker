@@ -331,6 +331,15 @@ Store only the allowlisted Taiga variables in `mcp/.env`; never commit or share 
 | `move_status` | Update an issue's status by name (e.g. "In progress", "Done") |
 | `add_comment` | Add a comment to an issue |
 | `assign_user` | Assign a team member to an issue by username |
+| `list_epics` | List concise epic details for a project |
+| `create_epic` | Create an epic in a project |
+| `create_user_story` | Create a user story in a project |
+| `link_story_to_epic` | Link an existing user story to an epic |
+| `list_milestones` / `create_milestone` / `update_milestone` | Manage dated Taiga milestones (sprints) |
+| `list_user_stories` / `update_user_story` | Read and reconcile story planning metadata |
+| `create_task` / `list_tasks` / `update_task` | Manage tasks under user stories |
+| `preview_course_plan` | Validate and preview a typed course plan without remote calls |
+| `apply_course_plan` | Idempotently reconcile a marked course plan with bounded retry progress |
 
 ### Known Limitations
 
@@ -338,6 +347,9 @@ Store only the allowlisted Taiga variables in `mcp/.env`; never commit or share 
 - `move_status` resolves status names case-insensitively; use the exact name from your project's board
 - `assign_user` requires the Taiga username (not display name) of the team member
 - No WebSocket/events support — this MCP operates on REST API only
+- Course-plan reconciliation relies on stable `[course:...]` subject markers; do not remove them
+- Course-plan apply is additive/update-only and never deletes omitted remote objects
+- Restart the AI client after tool registry changes so it launches a new MCP process
 
 ### File Structure
 
@@ -347,9 +359,9 @@ mcp/
     __init__.py     # package marker
     client.py       # HTTP client with lazy auth
     launcher.py     # secure credential loader and process entry point
-    server.py       # FastMCP server with 5 tools
-  tests/            # credential-loader tests using temporary files
-  README.md         # setup and client registration guide
+    server.py       # FastMCP server tools
+  tests/            # launcher, tool, and HTTP client tests
+  README.md         # setup, tool inventory, and client registration guide
   requirements.txt  # mcp>=1.0, httpx>=0.27
   run.sh            # POSIX wrapper for the Python launcher
 opencode.json       # MCP server registration (project-level)
