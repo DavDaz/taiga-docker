@@ -3,6 +3,7 @@
 from datetime import date
 from typing import Literal
 
+from httpx import HTTPStatusError
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -104,7 +105,24 @@ def _choice_id(items: list[dict], value: str, label: str, id_field: str = "id") 
 
 
 def _members(client: TaigaClient, project_id: int) -> list[dict]:
-    return client.get(f"/api/v1/projects/{project_id}/members")
+    try:
+        return client.get(f"/api/v1/projects/{project_id}/members")
+    except HTTPStatusError as exc:
+        if exc.response.status_code != 404:
+            raise
+
+    memberships = client.get(f"/api/v1/memberships?project={project_id}")
+    members = []
+    for membership in memberships:
+        user = membership.get("user")
+        if isinstance(user, dict):
+            user_details = user
+        else:
+            user_details = membership.get("user_extra_info") or {}
+            if "username" not in user_details:
+                user_details = client.get(f"/api/v1/users/{user}")
+        members.append({**user_details, "id": user_details.get("id", user)})
+    return members
 
 
 def _resolve_assignee(members: list[dict], username: str) -> int:
@@ -121,7 +139,14 @@ def _resolve_points(
     resolved: dict[str, int] = {}
     for estimate in estimates:
         role_id = _choice_id(roles, estimate.role, "name")
-        matches = [point for point in points if float(point["value"]) == estimate.value]
+        matches = []
+        for point in points:
+            try:
+                value = float(point["value"])
+            except (TypeError, ValueError):
+                continue
+            if value == estimate.value:
+                matches.append(point)
         if len(matches) != 1:
             available = ", ".join(str(point["value"]) for point in points) or "none"
             raise ValueError(

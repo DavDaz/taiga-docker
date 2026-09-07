@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock
 from datetime import date
 
+import httpx
 import pytest
 
 from taiga_mcp import server
@@ -12,6 +13,70 @@ def client(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     client.base_url = "https://taiga.example"
     monkeypatch.setattr(server, "get_client", lambda: client)
     return client
+
+
+def test_members_uses_legacy_project_member_shape(client: MagicMock) -> None:
+    members = [{"id": 9, "username": "alex"}]
+    client.get.return_value = members
+
+    assert server._members(client, 12) == members
+    client.get.assert_called_once_with("/api/v1/projects/12/members")
+
+
+@pytest.mark.parametrize(
+    ("membership", "user_response", "expected"),
+    [
+        (
+            {"id": 41, "user": 9, "user_extra_info": {"username": "alex"}},
+            None,
+            {"id": 9, "username": "alex"},
+        ),
+        (
+            {"id": 41, "user": {"id": 9, "username": "alex"}},
+            None,
+            {"id": 9, "username": "alex"},
+        ),
+        (
+            {"id": 41, "user": 9},
+            {"id": 9, "username": "alex"},
+            {"id": 9, "username": "alex"},
+        ),
+    ],
+)
+def test_members_falls_back_and_normalizes_memberships(
+    client: MagicMock, membership: dict, user_response: dict | None, expected: dict
+) -> None:
+    request = httpx.Request("GET", "https://taiga.example/api/v1/projects/12/members")
+    response = httpx.Response(404, request=request)
+    responses = [
+        httpx.HTTPStatusError("Not Found", request=request, response=response),
+        [membership],
+    ]
+    if user_response:
+        responses.append(user_response)
+    client.get.side_effect = responses
+
+    assert server._members(client, 12) == [expected]
+    expected_paths = [
+        "/api/v1/projects/12/members",
+        "/api/v1/memberships?project=12",
+    ]
+    if user_response:
+        expected_paths.append("/api/v1/users/9")
+    assert [call.args[0] for call in client.get.call_args_list] == expected_paths
+
+
+def test_members_does_not_hide_non_404_errors(client: MagicMock) -> None:
+    request = httpx.Request("GET", "https://taiga.example/api/v1/projects/12/members")
+    response = httpx.Response(403, request=request)
+    error = httpx.HTTPStatusError("Forbidden", request=request, response=response)
+    client.get.side_effect = error
+
+    with pytest.raises(httpx.HTTPStatusError) as raised:
+        server._members(client, 12)
+
+    assert raised.value is error
+    client.get.assert_called_once_with("/api/v1/projects/12/members")
 
 
 def test_list_epics_returns_concise_project_scoped_results(client: MagicMock) -> None:
@@ -188,7 +253,11 @@ def test_update_story_resolves_points_and_planning_metadata(client: MagicMock) -
         [{"id": 5, "name": "Ready"}],
         [{"id": 9, "username": "alex"}],
         [{"id": 2, "name": "Developer"}],
-        [{"id": 8, "value": 3}],
+        [
+            {"id": 7, "value": None},
+            {"id": 8, "value": 3},
+            {"id": 9, "value": "unavailable"},
+        ],
     ]
     client.patch.return_value = {"id": 21, "subject": "Lesson"}
 
@@ -215,6 +284,25 @@ def test_update_story_resolves_points_and_planning_metadata(client: MagicMock) -
             "version": 4,
         },
     )
+
+
+def test_update_story_reports_no_valid_point_match_without_patch(client: MagicMock) -> None:
+    client.get_entity_with_version.return_value = {"project": 12, "version": 3}
+    client.get.side_effect = [
+        [{"id": 2, "name": "Developer"}],
+        [{"id": 7, "value": None}, {"id": 8, "value": "unavailable"}],
+    ]
+
+    with pytest.raises(
+        ValueError,
+        match="Point value '3.0' not found uniquely. Available: None, unavailable",
+    ):
+        server.update_user_story(
+            21,
+            points=[server.PointEstimate(role="developer", value=3)],
+        )
+
+    client.patch.assert_not_called()
 
 
 def test_status_resolution_failure_lists_choices_without_patch(client: MagicMock) -> None:
@@ -369,6 +457,30 @@ def test_apply_course_plan_resolves_all_references_before_mutation(client: Magic
     with pytest.raises(ValueError, match="Available: Ready"):
         server.apply_course_plan(plan)
 
+    client.post.assert_not_called()
+    client.patch.assert_not_called()
+
+
+def test_course_preflight_ignores_unavailable_points_and_resolves_valid_match(
+    client: MagicMock,
+) -> None:
+    plan = _plan()
+    plan.weeks[0].stories[0].points = [server.PointEstimate(role="developer", value=3)]
+    client.get.side_effect = [
+        [],
+        [],
+        [],
+        [{"id": 2, "name": "Developer"}],
+        [
+            {"id": 7, "value": None},
+            {"id": 8, "value": 3},
+            {"id": 9, "value": "unavailable"},
+        ],
+    ]
+
+    resolved = server._course_preflight(client, plan)
+
+    assert resolved["stories"]["lesson-1"]["points"] == {"2": 8}
     client.post.assert_not_called()
     client.patch.assert_not_called()
 

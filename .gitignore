@@ -6,7 +6,6 @@ mcp/.env
 backups/
 .atl/
 .codegraph/
-.engram/
 .DS_Store
 **/.DS_Store
 **/__pycache__/
