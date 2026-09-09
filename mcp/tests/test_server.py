@@ -225,6 +225,25 @@ def test_update_task_resolves_names_and_fetches_version_immediately_before_patch
     assert result["updated"] == ["assigned_to", "status", "tags", "us_order"]
 
 
+@pytest.mark.parametrize(
+    ("current", "expected_payload"),
+    [
+        ({"id": 31}, {"name": "Unit 1"}),
+        ({"id": 31, "version": None}, {"name": "Unit 1"}),
+        ({"id": 31, "version": 6}, {"name": "Unit 1", "version": 6}),
+    ],
+)
+def test_patch_current_omits_missing_version_and_preserves_present_version(
+    client: MagicMock, current: dict, expected_payload: dict
+) -> None:
+    client.get_entity_with_version.return_value = current
+    client.patch.return_value = {"id": 31, "name": "Unit 1"}
+
+    server._patch_current(client, "milestones", 31, {"name": "Unit 1"})
+
+    client.patch.assert_called_once_with("/api/v1/milestones/31", expected_payload)
+
+
 def test_update_milestone_uses_current_version_and_validates_effective_dates(
     client: MagicMock,
 ) -> None:
@@ -352,7 +371,16 @@ def test_preview_course_plan_is_deterministic_and_performs_no_calls(
     assert first == second
     assert first["mutations"] == 0
     assert first["counts"] == {"milestones": 1, "stories": 1, "tasks": 1}
-    assert first["operations"][0]["subject"].startswith("[course:create-with-code:epic]")
+    assert first["operations"][0] == {
+        "action": "reconcile",
+        "type": "epic",
+        "key": "create-with-code",
+        "subject": "Create with Code",
+        "identity": "[course:create-with-code:epic]",
+    }
+    assert first["operations"][1]["name"] == "Unit 1"
+    assert first["operations"][2]["subject"] == "Player control"
+    assert first["operations"][3]["subject"] == "Practice"
     get_client.assert_not_called()
 
 
@@ -485,6 +513,89 @@ def test_course_preflight_ignores_unavailable_points_and_resolves_valid_match(
     client.patch.assert_not_called()
 
 
+def test_course_metadata_envelope_preserves_authored_description() -> None:
+    marker = "[course:create-with-code:story:lesson-1]"
+    description = "Authored **Markdown**\n\nwith whitespace preserved."
+
+    stored = server._with_course_metadata(marker, description)
+
+    assert stored == f"<!-- {marker} -->\n{description}"
+    assert server._with_course_metadata(marker, stored) == stored
+    assert server._has_course_metadata(stored, marker) is True
+
+
+def test_course_metadata_duplicate_identity_aborts() -> None:
+    marker = "[course:create-with-code:story:lesson-1]"
+    items = [
+        {"id": 1, "subject": "First", "description": f"<!-- {marker} -->"},
+        {"id": 2, "subject": "Second", "description": f"<!-- {marker} -->"},
+    ]
+
+    with pytest.raises(ValueError, match="Multiple Taiga objects use stable marker"):
+        server._find_marked(items, "subject", marker)
+
+
+def test_apply_course_plan_migrates_legacy_markers_without_duplicates(client: MagicMock) -> None:
+    plan = _plan()
+    plan.epic_description = "Epic context"
+    plan.weeks[0].stories[0].description = "Story context"
+    plan.weeks[0].stories[0].tasks[0].description = "Task context"
+    epic_marker = "[course:create-with-code:epic]"
+    week_marker = "[course:create-with-code:week:week-1]"
+    story_marker = "[course:create-with-code:story:lesson-1]"
+    task_marker = "[course:create-with-code:task:lesson-1:practice]"
+    state = {
+        "epics": [{"id": 10, "subject": f"{epic_marker} Old title", "description": "Epic context"}],
+        "milestones": [{"id": 11, "name": f"{week_marker} Old title", "estimated_start": "2026-09-07", "estimated_finish": "2026-09-13", "order": 1}],
+        "stories": [{"id": 12, "subject": f"{story_marker} Old title", "description": "Story context", "milestone": 11, "tags": ["lesson", "unity"], "sprint_order": 1}],
+        "tasks": [{"id": 13, "subject": f"{task_marker} Old title", "description": "Task context", "milestone": 11, "tags": [], "us_order": 1}],
+    }
+
+    def get(path: str):
+        if path == "/api/v1/projects/12/members" or path.endswith(("statuses?project=12", "roles?project=12", "points?project=12")):
+            return []
+        if path == "/api/v1/epics?project=12":
+            return state["epics"]
+        if path == "/api/v1/milestones?project=12":
+            return state["milestones"]
+        if path == "/api/v1/userstories?project=12":
+            return state["stories"]
+        if path == "/api/v1/tasks?project=12&user_story=12":
+            return state["tasks"]
+        if path == "/api/v1/epics/10/related_userstories":
+            return [{"epic": 10, "user_story": 12}]
+        raise AssertionError(path)
+
+    def get_entity(entity_type: str, entity_id: int) -> dict:
+        collection = {"epics": "epics", "milestones": "milestones", "userstories": "stories", "tasks": "tasks"}[entity_type]
+        return {**next(item for item in state[collection] if item["id"] == entity_id), "version": 1}
+
+    def patch(path: str, data: dict) -> dict:
+        entity_type, entity_id = path.rsplit("/", 1)
+        collection = {"epics": "epics", "milestones": "milestones", "userstories": "stories", "tasks": "tasks"}[entity_type.split("/")[-1]]
+        item = next(item for item in state[collection] if item["id"] == int(entity_id))
+        item.update({key: value for key, value in data.items() if key != "version"})
+        return item
+
+    client.get.side_effect = get
+    client.get_entity_with_version.side_effect = get_entity
+    client.patch.side_effect = patch
+
+    result = server.apply_course_plan(plan)
+
+    assert result["ok"] is True
+    assert result["counts"] == {"created": 0, "updated": 4, "skipped": 1, "failed": 0}
+    assert state["epics"][0]["subject"] == "Create with Code"
+    assert state["stories"][0]["subject"] == "Player control"
+    assert state["tasks"][0]["subject"] == "Practice"
+    assert state["milestones"][0]["name"] == "Unit 1"
+    assert state["milestones"][0]["slug"] == "course-create-with-code-week-week-1"
+    assert state["epics"][0]["description"] == f"<!-- {epic_marker} -->\nEpic context"
+    assert state["stories"][0]["description"] == f"<!-- {story_marker} -->\nStory context"
+    assert state["tasks"][0]["description"] == f"<!-- {task_marker} -->\nTask context"
+    client.post.assert_not_called()
+
+
 def test_apply_course_plan_is_retry_safe_after_partial_failure(client: MagicMock) -> None:
     state = {"epics": [], "milestones": [], "stories": [], "tasks": [], "relations": []}
     next_ids = iter(range(100, 110))
@@ -547,3 +658,11 @@ def test_apply_course_plan_is_retry_safe_after_partial_failure(client: MagicMock
     assert second["counts"] == {"created": 1, "updated": 0, "skipped": 4, "failed": 0}
     assert len(state["epics"]) == len(state["milestones"]) == len(state["stories"]) == 1
     assert len(state["tasks"]) == len(state["relations"]) == 1
+    assert state["epics"][0]["subject"] == "Create with Code"
+    assert state["epics"][0]["description"] == "<!-- [course:create-with-code:epic] -->"
+    assert state["milestones"][0]["name"] == "Unit 1"
+    assert state["milestones"][0]["slug"] == "course-create-with-code-week-week-1"
+    assert state["stories"][0]["subject"] == "Player control"
+    assert state["stories"][0]["description"] == "<!-- [course:create-with-code:story:lesson-1] -->"
+    assert state["tasks"][0]["subject"] == "Practice"
+    assert state["tasks"][0]["description"] == "<!-- [course:create-with-code:task:lesson-1:practice] -->"

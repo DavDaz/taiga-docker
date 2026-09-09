@@ -1,7 +1,7 @@
 """Narrow Taiga MCP tools for issues, planning, and repeatable course plans."""
 
 from datetime import date
-from typing import Literal
+from typing import Any, Literal, cast
 
 from httpx import HTTPStatusError
 from mcp.server.fastmcp import FastMCP
@@ -94,7 +94,7 @@ def get_client() -> TaigaClient:
     return _client
 
 
-def _choice_id(items: list[dict], value: str, label: str, id_field: str = "id") -> int:
+def _choice_id(items: Any, value: str, label: str, id_field: str = "id") -> int:
     matches = [item for item in items if item[label].casefold() == value.casefold()]
     if len(matches) == 1:
         return matches[0][id_field]
@@ -106,7 +106,7 @@ def _choice_id(items: list[dict], value: str, label: str, id_field: str = "id") 
 
 def _members(client: TaigaClient, project_id: int) -> list[dict]:
     try:
-        return client.get(f"/api/v1/projects/{project_id}/members")
+        return cast(list[dict], client.get(f"/api/v1/projects/{project_id}/members"))
     except HTTPStatusError as exc:
         if exc.response.status_code != 404:
             raise
@@ -125,17 +125,15 @@ def _members(client: TaigaClient, project_id: int) -> list[dict]:
     return members
 
 
-def _resolve_assignee(members: list[dict], username: str) -> int:
+def _resolve_assignee(members: Any, username: str) -> int:
     return _choice_id(members, username, "username")
 
 
-def _resolve_status(statuses: list[dict], name: str) -> int:
+def _resolve_status(statuses: Any, name: str) -> int:
     return _choice_id(statuses, name, "name")
 
 
-def _resolve_points(
-    estimates: list[PointEstimate], roles: list[dict], points: list[dict]
-) -> dict[str, int]:
+def _resolve_points(estimates: list[PointEstimate], roles: Any, points: Any) -> dict[str, int]:
     resolved: dict[str, int] = {}
     for estimate in estimates:
         role_id = _choice_id(roles, estimate.role, "name")
@@ -158,10 +156,9 @@ def _resolve_points(
 
 def _patch_current(client: TaigaClient, entity_type: str, entity_id: int, changes: dict) -> dict:
     current = client.get_entity_with_version(entity_type, entity_id)
-    return client.patch(
-        f"/api/v1/{entity_type}/{entity_id}",
-        {**changes, "version": current["version"]},
-    )
+    if current.get("version") is not None:
+        changes = {**changes, "version": current["version"]}
+    return client.patch(f"/api/v1/{entity_type}/{entity_id}", changes)
 
 
 def _marker(kind: str, plan_key: str, key: str = "") -> str:
@@ -169,8 +166,23 @@ def _marker(kind: str, plan_key: str, key: str = "") -> str:
     return f"[course:{plan_key}:{kind}{suffix}]"
 
 
-def _marked_subject(marker: str, subject: str) -> str:
-    return f"{marker} {subject}"
+def _metadata_envelope(marker: str) -> str:
+    return f"<!-- {marker} -->"
+
+
+def _with_course_metadata(marker: str, description: str) -> str:
+    envelope = _metadata_envelope(marker)
+    if description.startswith(envelope):
+        return description
+    return f"{envelope}\n{description}" if description else envelope
+
+
+def _has_course_metadata(description: str, marker: str) -> bool:
+    return description.startswith(_metadata_envelope(marker))
+
+
+def _milestone_slug(marker: str) -> str:
+    return marker[1:-1].replace(":", "-")
 
 
 def _summary_item(item: dict) -> dict:
@@ -309,10 +321,9 @@ def update_milestone(
     effective_end = end_date or date.fromisoformat(current["estimated_finish"])
     if effective_end < effective_start:
         raise ValueError("end_date must be on or after start_date")
-    updated = client.patch(
-        f"/api/v1/milestones/{milestone_id}",
-        {**changes, "version": current["version"]},
-    )
+    if current.get("version") is not None:
+        changes["version"] = current["version"]
+    updated = client.patch(f"/api/v1/milestones/{milestone_id}", changes)
     return {"id": updated["id"], "name": updated["name"], "updated": sorted(changes)}
 
 
@@ -466,12 +477,13 @@ def update_task(
 
 
 def _course_operations(plan: CoursePlan) -> list[dict]:
-    operations = [
+    operations: list[dict[str, Any]] = [
         {
             "action": "reconcile",
             "type": "epic",
             "key": plan.plan_key,
-            "subject": _marked_subject(_marker("epic", plan.plan_key), plan.epic_subject),
+            "subject": plan.epic_subject,
+            "identity": _marker("epic", plan.plan_key),
         }
     ]
     for week_index, week in enumerate(plan.weeks, 1):
@@ -480,7 +492,8 @@ def _course_operations(plan: CoursePlan) -> list[dict]:
                 "action": "reconcile",
                 "type": "milestone",
                 "key": week.key,
-                "name": _marked_subject(_marker("week", plan.plan_key, week.key), week.name),
+                "name": week.name,
+                "identity": _marker("week", plan.plan_key, week.key),
                 "start_date": week.start_date.isoformat(),
                 "end_date": week.end_date.isoformat(),
                 "order": week_index,
@@ -494,7 +507,8 @@ def _course_operations(plan: CoursePlan) -> list[dict]:
                     "type": "user_story",
                     "key": story.key,
                     "week": week.key,
-                    "subject": _marked_subject(marker, story.subject),
+                    "subject": story.subject,
+                    "identity": marker,
                     "kind": story.kind,
                     "order": story_index,
                     "task_count": len(story.tasks),
@@ -507,9 +521,8 @@ def _course_operations(plan: CoursePlan) -> list[dict]:
                         "type": "task",
                         "key": task.key,
                         "story": story.key,
-                        "subject": _marked_subject(
-                            _marker("task", plan.plan_key, f"{story.key}:{task.key}"), task.subject
-                        ),
+                        "subject": task.subject,
+                        "identity": _marker("task", plan.plan_key, f"{story.key}:{task.key}"),
                         "order": task_index,
                     }
                 )
@@ -561,8 +574,19 @@ def _course_preflight(client: TaigaClient, plan: CoursePlan) -> dict:
     return resolved
 
 
-def _find_marked(items: list[dict], field: str, marker: str) -> dict | None:
-    matches = [item for item in items if item.get(field, "").startswith(marker + " ")]
+def _find_marked(
+    items: Any, field: str, marker: str, identity_field: str = "description"
+) -> dict | None:
+    matches = [
+        item
+        for item in items
+        if item.get(field, "").startswith(marker + " ")
+        or (
+            item.get(identity_field) == _milestone_slug(marker)
+            if identity_field == "slug"
+            else _has_course_metadata(item.get(identity_field, ""), marker)
+        )
+    ]
     if len(matches) > 1:
         raise ValueError(f"Multiple Taiga objects use stable marker {marker}")
     return matches[0] if matches else None
@@ -578,24 +602,32 @@ def apply_course_plan(plan: CoursePlan) -> dict:
     _course_operations(plan)
     client = get_client()
     resolved = _course_preflight(client, plan)
-    existing_epics = client.get(f"/api/v1/epics?project={plan.project_id}")
-    existing_milestones = client.get(f"/api/v1/milestones?project={plan.project_id}")
-    existing_stories = client.get(f"/api/v1/userstories?project={plan.project_id}")
+    existing_epics = cast(list[dict], client.get(f"/api/v1/epics?project={plan.project_id}"))
+    existing_milestones = cast(list[dict], client.get(f"/api/v1/milestones?project={plan.project_id}"))
+    existing_stories = cast(list[dict], client.get(f"/api/v1/userstories?project={plan.project_id}"))
 
     # Reject ambiguous reconciliation state before the first mutation.
     _find_marked(existing_epics, "subject", _marker("epic", plan.plan_key))
     existing_tasks_by_story: dict[str, list[dict]] = {}
     existing_tasks: list[dict] = []
     for week in plan.weeks:
-        _find_marked(existing_milestones, "name", _marker("week", plan.plan_key, week.key))
+        _find_marked(
+            existing_milestones,
+            "name",
+            _marker("week", plan.plan_key, week.key),
+            identity_field="slug",
+        )
         for story in week.stories:
             existing_story = _find_marked(
                 existing_stories, "subject", _marker("story", plan.plan_key, story.key)
             )
             story_tasks = (
-                client.get(
-                    f"/api/v1/tasks?project={plan.project_id}&user_story={existing_story['id']}"
-                )
+                    cast(
+                        list[dict],
+                        client.get(
+                            f"/api/v1/tasks?project={plan.project_id}&user_story={existing_story['id']}"
+                        ),
+                    )
                 if existing_story
                 else []
             )
@@ -614,20 +646,21 @@ def apply_course_plan(plan: CoursePlan) -> dict:
 
     try:
         epic_marker = _marker("epic", plan.plan_key)
-        epic_subject = _marked_subject(epic_marker, plan.epic_subject)
+        epic_subject = plan.epic_subject
+        epic_description = _with_course_metadata(epic_marker, plan.epic_description)
         epic = _find_marked(existing_epics, "subject", epic_marker)
         if epic is None:
             epic = client.post(
                 "/api/v1/epics",
-                {"project": plan.project_id, "subject": epic_subject, "description": plan.epic_description},
+                {"project": plan.project_id, "subject": epic_subject, "description": epic_description},
             )
             _record(summary, "created", "epic", epic)
-        elif epic.get("subject") != epic_subject or epic.get("description", "") != plan.epic_description:
+        elif epic.get("subject") != epic_subject or epic.get("description", "") != epic_description:
             epic = _patch_current(
                 client,
                 "epics",
                 epic["id"],
-                {"subject": epic_subject, "description": plan.epic_description},
+                {"subject": epic_subject, "description": epic_description},
             )
             _record(summary, "updated", "epic", epic)
         else:
@@ -637,14 +670,15 @@ def apply_course_plan(plan: CoursePlan) -> dict:
         for week_index, week in enumerate(plan.weeks, 1):
             operation = {"type": "milestone", "key": week.key}
             marker = _marker("week", plan.plan_key, week.key)
-            name = _marked_subject(marker, week.name)
+            name = week.name
             desired = {
                 "name": name,
+                "slug": _milestone_slug(marker),
                 "estimated_start": week.start_date.isoformat(),
                 "estimated_finish": week.end_date.isoformat(),
                 "order": week_index,
             }
-            milestone = _find_marked(existing_milestones, "name", marker)
+            milestone = _find_marked(existing_milestones, "name", marker, identity_field="slug")
             if milestone is None:
                 milestone = client.post("/api/v1/milestones", {"project": plan.project_id, **desired})
                 _record(summary, "created", "milestone", milestone)
@@ -660,10 +694,10 @@ def apply_course_plan(plan: CoursePlan) -> dict:
             for story_index, story_spec in enumerate(week.stories, 1):
                 operation = {"type": "user_story", "key": story_spec.key}
                 marker = _marker("story", plan.plan_key, story_spec.key)
-                subject = _marked_subject(marker, story_spec.subject)
+                subject = story_spec.subject
                 desired = {
                     "subject": subject,
-                    "description": story_spec.description,
+                    "description": _with_course_metadata(marker, story_spec.description),
                     "milestone": milestone["id"],
                     "tags": list(dict.fromkeys([story_spec.kind, *story_spec.tags])),
                     "sprint_order": story_index,
@@ -702,10 +736,10 @@ def apply_course_plan(plan: CoursePlan) -> dict:
                         "user_story_key": story_spec.key,
                     }
                     task_marker = _marker("task", plan.plan_key, f"{story_spec.key}:{task_spec.key}")
-                    task_subject = _marked_subject(task_marker, task_spec.subject)
+                    task_subject = task_spec.subject
                     task_desired = {
                         "subject": task_subject,
-                        "description": task_spec.description,
+                        "description": _with_course_metadata(task_marker, task_spec.description),
                         "milestone": milestone["id"],
                         "tags": task_spec.tags,
                         "us_order": task_index,

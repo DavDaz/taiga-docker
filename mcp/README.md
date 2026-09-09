@@ -5,7 +5,7 @@ This directory provides a local stdio MCP server for Taiga. It gives an AI clien
 ## Tools
 
 | Tool | Effect |
-|------|--------|
+| ------ | -------- |
 | `list_projects` | Read accessible projects and return `id`, `name`, and `slug` |
 | `create_issue` | Create an issue in a project |
 | `move_status` | Move an issue to a named status |
@@ -32,7 +32,9 @@ The `list_*` and `preview_course_plan` tools are read-only. Review the requested
 
 `preview_course_plan` validates dates, ordering, unique references, and the closed input schema without accessing Taiga. `apply_course_plan` repeats validation, resolves every supplied status, role, point value, and assignee before its first mutation, then reconciles one epic, dated milestones, granular stories, and their tasks.
 
-Managed objects receive stable subject prefixes such as `[course:create-with-code:story:lesson-1]`. Keep these markers intact: they are the idempotency keys that make retries update or skip existing objects instead of duplicating them. Apply stops after the first remote failure and returns bounded `created`, `updated`, `skipped`, and `failed` details; rerun the same plan to continue safely.
+Managed course-plan objects keep clean human-visible epic, story, task, and milestone titles. Their stable identities are stored in an anchored hidden HTML comment at the start of epic/story/task descriptions, while milestones use a deterministic marker-derived `slug` that Taiga does not show as the sidebar label. These identities make retries update or skip existing objects instead of duplicating them; authored description text is preserved after the metadata envelope.
+
+Existing plans that use legacy visible prefixes such as `[course:create-with-code:story:lesson-1]` remain supported. The next successful apply migrates each matched legacy item to its clean title and durable identity without creating a duplicate. **Do not manually rename legacy managed items before one successful apply:** that would remove the only identity available for safe migration. Apply stops after the first remote failure and returns bounded `created`, `updated`, `skipped`, and `failed` details; rerun the same plan to continue safely.
 
 Course-plan apply does not delete remote objects omitted from a later plan. This is intentional: destructive synchronization is outside this MCP's narrow safety boundary.
 
@@ -148,7 +150,7 @@ Create a user story in Taiga project 12 with subject "Add setup checklist", then
 ## Troubleshooting
 
 | Symptom | Check |
-|---------|-------|
+| --------- | ------- |
 | Virtual environment is missing | Run the venv creation and dependency installation commands above |
 | Credentials file cannot be opened safely | Confirm `mcp/.env` is a regular file, not a symlink |
 | Unsafe permissions | Run `chmod 600 mcp/.env` |
